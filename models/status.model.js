@@ -5,7 +5,7 @@ module.exports.findByName = (name, cb) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) reject(errorConnection);
       pool.query(
-        `SELECT status_id FROM status WHERE name = ? LIMIT 0, 1`,
+        `SELECT statusId FROM status WHERE name = ? LIMIT 0, 1`,
         name,
         (error, res) => {
           connection.release();

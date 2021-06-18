@@ -1,14 +1,14 @@
 const pool = require("../database/mysql.database");
 
 const Image = function (image) {
-  this.path = image.path;
-  this.alt = image.alt;
-  this.size = image.size;
+  this.imagePath = image.path;
+  this.imageAlt = image.alt;
+  this.imageSize = image.size;
   this.createdAt = image.createdAt;
   this.updatedAt = image.updatedAt;
 };
 
-Image.prototype.create = (newImage) => {
+Image.create = (newImage) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) reject(errorConnection);
@@ -17,7 +17,7 @@ Image.prototype.create = (newImage) => {
         if (error) {
           return reject(error);
         }
-        return resolve({ image_id: res.insertId, ...newImage });
+        return resolve({ imageId: res.insertId, ...newImage });
       });
     });
   });

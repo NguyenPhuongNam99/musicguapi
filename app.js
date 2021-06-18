@@ -3,6 +3,7 @@ require("./database/mysql.database");
 require("dotenv").config();
 const https = require("https");
 const fs = require("fs");
+const path = require("path");
 // var cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 var cors = require("cors");
@@ -18,9 +19,23 @@ const app = express();
 app.use(bodyParser.json());
 app.use(express.json());
 app.use(cors(corsOptions));
-
+app.use(
+  "/public/images/",
+  express.static(path.join(__dirname, "public/images/"))
+);
 const route = require("./routes/index");
+
 app.use("/", route);
+
+app.use((error, req, res, next) => {
+  console.error(error);
+  return res.status(error.status || 500).send({
+    error: {
+      status: error.status || 500,
+      message: error.message || "Internal Server Error",
+    },
+  });
+});
 
 const sslServer = https.createServer(
   {
