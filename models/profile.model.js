@@ -89,8 +89,8 @@ Profile.findByEmail = (email) => {
         p.profileType ,
         p.profileStatus ,
         p.avatar ,
-        i.imagePath as "avatarPath",
-        i.imageAlt as "avatarAlt"
+        i.path as "avatarPath",
+        i.alt as "avatarAlt"
         FROM
         profile p
         left join image i ON

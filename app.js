@@ -23,6 +23,10 @@ app.use(
   "/public/images/",
   express.static(path.join(__dirname, "public/images/"))
 );
+app.use(
+  "/public/tracks/",
+  express.static(path.join(__dirname, "public/tracks/"))
+);
 const route = require("./routes/index");
 
 app.use("/", route);

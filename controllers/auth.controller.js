@@ -1,4 +1,3 @@
-const pool = require("../database/mysql.database");
 const { OAuth2Client } = require("google-auth-library");
 const {
   signupValidation,
@@ -236,12 +235,12 @@ module.exports.signupSystem = async (req, res, next) => {
         avatarPath: existsProfile
           ? existsProfile.avatarPath
           : saveImage
-          ? saveImage.imagePath
+          ? saveImage.path
           : null,
         avatarAlt: existsProfile
           ? existsProfile.avatarAlt
           : saveImage
-          ? saveImage.imageAlt
+          ? saveImage.alt
           : null,
       });
   } catch (error) {
@@ -446,12 +445,12 @@ const signupWithSocial = async (dataSocial) => {
       avatarPath: existsProfile
         ? existsProfile.avatarPath
         : saveImage
-        ? saveImage.imagePath
+        ? saveImage.path
         : null,
       avatarAlt: existsProfile
         ? existsProfile.avatarAlt
         : saveImage
-        ? saveImage.imageAlt
+        ? saveImage.alt
         : null,
     };
   } catch (error) {

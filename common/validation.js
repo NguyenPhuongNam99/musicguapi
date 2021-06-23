@@ -101,3 +101,24 @@ module.exports.changeAvatarValidation = (data) => {
 
   return schema.validate(data);
 };
+
+module.exports.createPlaylistValidation = (data) => {
+  const schema = Joi.object({
+    title: Joi.string().trim().required(),
+    size: Joi.number().min(0),
+    duration: Joi.number().min(0),
+    type: Joi.number().min(0),
+    status: Joi.number().min(0).default(11), //playlist_public
+    thumbnail: {
+      path: Joi.string().trim(),
+      alt: Joi.string().trim(),
+      size: Joi.number().min(0),
+      createdAt: Joi.date().default(new Date()),
+      updatedAt: Joi.date().default(new Date()),
+    },
+    createdAt: Joi.date().default(new Date()),
+    updatedAt: Joi.date().default(new Date()),
+  });
+
+  return schema.validate(data);
+};

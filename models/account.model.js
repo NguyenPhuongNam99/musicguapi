@@ -33,8 +33,8 @@ Account.findWithProfileByEmail = (email, type) => {
         p.profileType,
         p.profileStatus,
         i.imageId as "avatarId",
-        i.imagePath as "avatarPath",
-        i.imageAlt as "avatarAlt"
+        i.path as "avatarPath",
+        i.alt as "avatarAlt"
         FROM
           account a
         INNER JOIN profile p ON
@@ -77,8 +77,8 @@ Account.findWithProfileById = (accountId) => {
         p.profileType,
         p.profileStatus,
         i.imageId as "avatarId",
-        i.imagePath as "avatarPath",
-        i.imageAlt as "avatarAlt"
+        i.path as "avatarPath",
+        i.alt as "avatarAlt"
         FROM
           account a
         INNER JOIN profile p ON
@@ -121,8 +121,8 @@ Account.findWithProfileBySocialAuthorization = (socialAuthorization, type) => {
         p.profileType,
         p.profileStatus,
         i.imageId as "avatarId",
-        i.imagePath as "avatarPath",
-        i.imageAlt as "avatarAlt"
+        i.path as "avatarPath",
+        i.alt as "avatarAlt"
         FROM
           account a
         INNER JOIN profile p ON

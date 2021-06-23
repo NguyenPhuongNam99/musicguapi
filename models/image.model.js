@@ -1,9 +1,9 @@
 const pool = require("../database/mysql.database");
 
 const Image = function (image) {
-  this.imagePath = image.path;
-  this.imageAlt = image.alt;
-  this.imageSize = image.size;
+  this.path = image.path;
+  this.alt = image.alt;
+  this.size = image.size;
   this.createdAt = image.createdAt;
   this.updatedAt = image.updatedAt;
 };
