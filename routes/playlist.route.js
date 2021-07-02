@@ -16,6 +16,17 @@ router.post(
   imageUpload,
   playlistController.createOwnPlaylist
 );
+router.put(
+  "/owner/update/:id",
+  verifyToken,
+  playlistController.updateOwnPlaylist
+);
+router.put(
+  "/owner/changethumbnail/:id",
+  verifyToken,
+  imageUpload,
+  playlistController.changeThumbnailOwnerPlaylist
+);
 router.delete(
   "/owner/delete/:id",
   verifyToken,

@@ -43,6 +43,43 @@ Playlist.getById = (playlistId) => {
     });
   });
 };
+Playlist.getByIdAndProfile = (playlistId, profileId) => {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((errorConnection, connection) => {
+      if (errorConnection) return reject(errorConnection);
+      pool.query(
+        `
+          SELECT
+            p.*,
+            i.path as "thumbnailPath",
+            i.alt as "thumbnailAlt"
+          FROM
+            playlist p
+          LEFT JOIN playlistType pt ON
+            p.playlistId = pt.playlist
+          LEFT JOIN image i ON
+            p.thumbnail = i.imageID
+          WHERE
+            p.playlistId = ?
+          AND
+            p.profile = ?
+          GROUP BY
+            p.playlistId
+          LIMIT 0,
+          1
+        `,
+        [playlistId, profileId],
+        (error, res) => {
+          connection.release();
+          if (error) {
+            return reject(createError(500, error.code + error.sqlMessage));
+          }
+          return resolve(res);
+        }
+      );
+    });
+  });
+};
 ////////////////////////////////////////////////////////////////////////////////
 Playlist.checkExistsById = (playlistId) => {
   return new Promise((resolve, reject) => {
@@ -176,6 +213,31 @@ Playlist.deleteByIdAndProfile = (playlistId, profileID) => {
             return resolve({ kind: "not_found" });
           }
           return resolve({ kind: "successfully" });
+        }
+      );
+    });
+  });
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+Playlist.updateById = (playlistId, title, thumbnail) => {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((errorConnection, connection) => {
+      if (errorConnection) return reject(errorConnection);
+      pool.query(
+        "UPDATE playlist SET title = ?, thumbnail = ? WHERE playlistId = ?",
+        [title, thumbnail, playlistId],
+        (error, res) => {
+          connection.release();
+          if (error) {
+            return reject(createError(500, error.code + error.sqlMessage));
+          }
+          if (res.affectedRows == 0) {
+            // not found Customer with the id
+            return resolve({ status: "not_found" });
+          }
+          return resolve({ status: "successfully" });
         }
       );
     });

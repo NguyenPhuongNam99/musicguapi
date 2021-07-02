@@ -200,6 +200,83 @@ module.exports.createOwnPlaylist = async (req, res, next) => {
 
 //////////////////////////////////////////////////////////////////////////////////
 
+module.exports.updateOwnPlaylist = async (req, res, next) => {
+  try {
+    const bodyValidation = updatePlaylistValidation(req.body);
+
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
+    }
+    if (req.params.id) {
+      const existsPlaylist = await playlistModel.getByIdAndProfile(
+        req.params.id,
+        req.dataToken.profileId
+      );
+      if (!existsPlaylist || !existsPlaylist[0])
+        throw createError(404, "The playlist not found");
+      if (bodyValidation.value.title)
+        existsPlaylist[0].title = bodyValidation.value.title;
+      const result = await playlistModel.updateById(
+        req.params.id,
+        existsPlaylist[0].title,
+        existsPlaylist[0].thumbnail
+      );
+      if (result.status === "not_found") {
+        throw createError(404, "Not Found");
+      }
+      return res
+        .set("Authorization", `Bearer ${req.newToken || ""}`)
+        .status(200)
+        .send(existsPlaylist[0]);
+    } else {
+      throw createError(404, "The playlist not found");
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.changeThumbnailOwnerPlaylist = async (req, res, next) => {
+  let saveImage = null;
+  try {
+    if (req.params.id) {
+      const existsPlaylist = await playlistModel.getByIdAndProfile(
+        req.params.id,
+        req.dataToken.profileId
+      );
+      if (!existsPlaylist || !existsPlaylist[0])
+        throw createError(404, "The playlist not found");
+      if (req.body.image) {
+        const newImage = new imageModel(req.body.image);
+        saveImage = await imageModel.create(newImage);
+        existsPlaylist[0].thumbnail = saveImage.imageId;
+        existsPlaylist[0].thumbnailPath = saveImage.path;
+        existsPlaylist[0].thumbnailAlt = saveImage.alt;
+        const result = await playlistModel.updateById(
+          req.params.id,
+          existsPlaylist[0].title,
+          existsPlaylist[0].thumbnail
+        );
+        if (result.status === "not_found") {
+          throw createError(404, "Not Found");
+        }
+      }
+      return res
+        .set("Authorization", `Bearer ${req.newToken || ""}`)
+        .status(200)
+        .send(existsPlaylist[0]);
+    } else {
+      throw createError(404, "The playlist not found");
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
 module.exports.deleteOwnPlaylist = async (req, res, next) => {
   let savePlaylist = null;
   try {

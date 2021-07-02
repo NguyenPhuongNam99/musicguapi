@@ -176,3 +176,11 @@ module.exports.addTracksToOwnerPlaylistValidation = (data) => {
 
   return schema.validate(data);
 };
+
+module.exports.updatePlaylistValidation = (data) => {
+  const schema = Joi.object({
+    title: Joi.number().min(0).default(null),
+  });
+
+  return schema.validate(data);
+};
