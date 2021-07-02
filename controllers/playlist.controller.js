@@ -3,7 +3,7 @@ const {
   createPlaylistValidation,
   playPlaylistValidation,
   followPlaylistValidation,
-  addTracksToPlaylistValidation,
+  addTracksToOwnerPlaylistValidation,
 } = require("../common/validation");
 const playlistModel = require("../models/playlist.model");
 const imageModel = require("../models/image.model");
@@ -14,6 +14,8 @@ const { databaseCode } = require("../database/variable.database");
 const {
   youtubeService,
   getYoutubePlaylistById,
+  getPlaylistItemsById,
+  getYoutubeVideoById,
 } = require("../common/googleService");
 const ytdl = require("ytdl-core");
 
@@ -122,36 +124,27 @@ module.exports.getTracksById = async (req, res, next) => {
     if (bodyValidation.error) {
       throw createError(400, bodyValidation.error.details[0].message);
     }
-    let requestId = null;
+    let listItems = null;
     if (bodyValidation.value.youtubePlaylistId) {
-      requestId = bodyValidation.value.youtubePlaylistId;
+      listItems = await getPlaylistItemsById(
+        bodyValidation.value.youtubePlaylistId,
+        bodyValidation.value.pageToken || null
+      );
     } else {
-      // if (bodyValidation.value.videoId) {
-      //   const track = await trackModel.findYoutubeVideoIdById(
-      //     bodyValidation.value.videoId
-      //   );
-      //   if (!track || !track[0]) {
-      //     throw createError(401, "The track does not match!");
-      //   }
-      //   requestId = track[0].youtubePlaylistId;
-      // }
-    }
-    youtubeService.playlistItems.list(
-      {
-        part: "snippet, status, contentDetails",
-        playlistId: requestId,
-        pageToken: bodyValidation.value.pageToken || null,
-      },
-      (err, response) => {
-        if (err) {
-          console.log("The API returned an error: " + err);
-          throw createError(401, "Youtube API V3 Error");
-        }
-        if (response) {
-          return res.status(200).send(response.data);
-        }
+      if (bodyValidation.value.playlistId) {
+        const existsTracks = await trackPlaylistModel.getByPlaylist(
+          bodyValidation.value.playlistId
+        );
+        if (!existsTracks) throw createError(404, "The playlist not found");
+        listItems = await Promise.all(
+          existsTracks.map((track) => {
+            return getYoutubeVideoById(track.trackYoutube);
+          })
+        );
       }
-    );
+    }
+    if (!listItems) throw createError(404, "The playlist not found");
+    return res.status(200).send(listItems);
   } catch (error) {
     next(error);
   }
@@ -338,7 +331,7 @@ module.exports.deleteFollowPlaylist = async (req, res, next) => {
 
 module.exports.addTracksToOwnerPlaylist = async (req, res, next) => {
   try {
-    const bodyValidation = addTracksToPlaylistValidation(req.body);
+    const bodyValidation = addTracksToOwnerPlaylistValidation(req.body);
 
     if (bodyValidation.error) {
       throw createError(400, bodyValidation.error.details[0].message);

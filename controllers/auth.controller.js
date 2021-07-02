@@ -1,7 +1,7 @@
 const { OAuth2Client } = require("google-auth-library");
 const {
   signupValidation,
-  signinSystemValidation,
+  signinValidation,
   signupSocialValidation,
   changePasswordValidation,
   changeProfileValidation,
@@ -16,8 +16,13 @@ const profileModel = require("../models/profile.model");
 const imageModel = require("../models/image.model");
 const accountModel = require("../models/account.model");
 const { createError } = require("../common/createError");
-const { sendMail, sendMailActive, sendMailForgetPassword } = require("../common/sendEmail");
+const {
+  sendMail,
+  sendMailActive,
+  sendMailForgetPassword,
+} = require("../common/sendEmail");
 const { downloadImage } = require("../common/downloadFile");
+const { databaseCode } = require("../database/variable.database");
 
 const client = new OAuth2Client(process.env.BACKEND_GOOGLE_CLIENT_ID);
 
@@ -55,65 +60,7 @@ module.exports.signupSystem = async (req, res, next) => {
       throw createError(401, "The email address is already !!!");
     }
 
-    const [
-      profileTypeCode,
-      accountTypeCode,
-      profileStatusCode,
-      accountStatusCode,
-      existsProfile,
-    ] = await Promise.all([
-      (async () => {
-        const profileTypeCode = await typeModel.findByName(
-          bodyValidation.value.profileType
-        );
-        if (profileTypeCode && profileTypeCode.length) {
-          return profileTypeCode[0].typeId;
-        } else {
-          throw createError(
-            401,
-            "Something in your account type does not match"
-          );
-        }
-      })(),
-      (async () => {
-        const accountTypeCode = await typeModel.findByName(
-          bodyValidation.value.accountType
-        );
-        if (accountTypeCode && accountTypeCode.length) {
-          return accountTypeCode[0].typeId;
-        } else {
-          throw createError(
-            401,
-            "Something in your account type does not match"
-          );
-        }
-      })(),
-      (async () => {
-        const statusCode = await statusModel.findByName(
-          bodyValidation.value.profileStatus
-        );
-        if (statusCode && statusCode.length) {
-          return statusCode[0].statusId;
-        } else {
-          throw createError(
-            401,
-            "Something in your account type does not match"
-          );
-        }
-      })(),
-      (async () => {
-        const statusCode = await statusModel.findByName(
-          bodyValidation.value.accountStatus
-        );
-        if (statusCode && statusCode.length) {
-          return statusCode[0].statusId;
-        } else {
-          throw createError(
-            401,
-            "Something in your account type does not match"
-          );
-        }
-      })(),
+    const [existsProfile] = await Promise.all([
       (async () => {
         //check exists profile
         const existsProfile = await profileModel.findByEmail(
@@ -145,8 +92,8 @@ module.exports.signupSystem = async (req, res, next) => {
         email: bodyValidation.value.username,
         avatar: saveImage ? saveImage.imageId : null,
         youtubeAccount: bodyValidation.value.youtubeAccount,
-        profileType: profileTypeCode,
-        profileStatus: profileStatusCode,
+        profileType: databaseCode.typeCode.profile_free,
+        profileStatus: databaseCode.statusCode.profile_public,
         createdAt: bodyValidation.value.createdAt,
         updatedAt: bodyValidation.value.updatedAt,
       });
@@ -157,8 +104,8 @@ module.exports.signupSystem = async (req, res, next) => {
       const newAccount = new accountModel({
         username: bodyValidation.value.username,
         password: hashPassword,
-        accountType: accountTypeCode,
-        accountStatus: accountStatusCode,
+        accountType: databaseCode.typeCode.account_system,
+        accountStatus: databaseCode.statusCode.account_inactive,
         profile: saveProfile.profileId,
         createdAt: bodyValidation.value.createdAt,
         updatedAt: bodyValidation.value.updatedAt,
@@ -171,8 +118,8 @@ module.exports.signupSystem = async (req, res, next) => {
       const newAccount = new accountModel({
         username: bodyValidation.value.username,
         password: hashPassword,
-        accountType: accountTypeCode,
-        accountStatus: accountStatusCode,
+        accountType: databaseCode.typeCode.account_system,
+        accountStatus: databaseCode.statusCode.account_inactive,
         profile: existsProfile.profileId,
         createdAt: bodyValidation.value.createdAt,
         updatedAt: bodyValidation.value.updatedAt,
@@ -252,44 +199,6 @@ module.exports.signupSystem = async (req, res, next) => {
     }
     next(error);
   }
-};
-
-//////////////////////////////////////////////////////////////////////////////////
-
-const signinWithSystem = async (username, password, type) => {
-  try {
-  } catch (error) {
-    throw error;
-  }
-  //sign in system account
-  if (!username || !password)
-    throw createError(401, "The email or password can't be empty");
-  const existAccount = await accountModel.findWithProfileByEmail(
-    username,
-    type
-  );
-  if (!existAccount || !existAccount[0]) {
-    throw createError(401, "The email does not match!");
-  }
-  const validPassword = bcrypt.compareSync(password, existAccount[0].password);
-  if (!validPassword) throw createError(401, "The password does not match!");
-  if (existAccount[0].accountStatus === 5)
-    throw createError(401, "The account is inactive!");
-  return {
-    accountId: existAccount[0].accountId,
-    username: existAccount[0].username,
-    accountType: existAccount[0].accountType,
-    accountStatus: existAccount[0].accountStatus,
-    socialAuthorization: existAccount[0].socialAuthorization,
-    profileId: existAccount[0].profileId,
-    email: existAccount[0].email,
-    fullName: existAccount[0].fullName,
-    profileType: existAccount[0].profileType,
-    profileStatus: existAccount[0].profileStatus,
-    avatarId: existAccount[0].avatarId,
-    avatarPath: existAccount[0].avatarPath,
-    avatarAlt: existAccount[0].avatarAlt,
-  };
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -464,6 +373,47 @@ const signupWithSocial = async (dataSocial) => {
   }
 };
 
+//////////////////////////////////////////////////////////////////////////////////
+
+const signinWithSystem = async (username, password, type) => {
+  try {
+  } catch (error) {
+    throw error;
+  }
+  //sign in system account
+  if (!username || !password)
+    throw createError(401, "The email or password can't be empty");
+  const existAccount = await accountModel.findWithProfileByEmail(
+    username,
+    type
+  );
+  if (!existAccount || !existAccount[0]) {
+    throw createError(401, "The email or password does not match!");
+  }
+  const validPassword = bcrypt.compareSync(password, existAccount[0].password);
+  if (!validPassword)
+    throw createError(401, "The email or password does not match!");
+  if (existAccount[0].accountStatus === 5)
+    throw createError(401, "The account is inactive!");
+  console.log(existAccount[0]);
+  return {
+    accountId: existAccount[0].accountId,
+    username: existAccount[0].username,
+    accountType: existAccount[0].accountType,
+    accountStatus: existAccount[0].accountStatus,
+    socialAuthorization: existAccount[0].socialAuthorization,
+    profileId: existAccount[0].profileId,
+    email: existAccount[0].email,
+    fullName: existAccount[0].fullName,
+    profileType: existAccount[0].profileType,
+    profileStatus: existAccount[0].profileStatus,
+    avatarId: existAccount[0].avatarId,
+    avatarPath: existAccount[0].avatarPath,
+    avatarAlt: existAccount[0].avatarAlt,
+    requirePassword: existAccount[0].requirePassword,
+  };
+};
+
 //////////////////////////////////////////////////////////////////////////////////////
 
 const signinWithFacebook = async (socialAuthorization, accessToken, type) => {
@@ -571,41 +521,35 @@ const signinWithGoogle = async (socialAuthorization, accessToken, type) => {
 
 module.exports.signin = async (req, res, next) => {
   try {
-    const bodyValidation = signinSystemValidation(req.body);
+    const bodyValidation = signinValidation(req.body);
     if (bodyValidation.error) {
       throw createError(400, bodyValidation.error.details[0].message);
     }
-    const accountTypeCode = await typeModel.findByName(
-      bodyValidation.value.accountType
-    );
-
-    if (!accountTypeCode || !accountTypeCode[0])
-      return res
-        .status(400)
-        .send({ message: "Something in your account type does not match" });
-
+    const accountTypeCode =
+      databaseCode.typeCode[bodyValidation.value.accountType];
+    if (!accountTypeCode) throw createError(404, "The type not found");
     let account = null;
     switch (bodyValidation.value.accountType) {
-      case "system":
+      case "account_system":
         //sign in system account
         account = await signinWithSystem(
           bodyValidation.value.username,
           bodyValidation.value.password,
-          accountTypeCode[0].typeId
+          accountTypeCode
         );
         break;
-      case "facebook":
+      case "account_facebook":
         account = await signinWithFacebook(
           bodyValidation.value.socialAuthorization,
           bodyValidation.value.accessToken,
-          accountTypeCode[0].typeId
+          accountTypeCode
         );
         break;
-      case "google":
+      case "account_google":
         account = await signinWithGoogle(
           bodyValidation.value.socialAuthorization,
           bodyValidation.value.accessToken,
-          accountTypeCode[0].typeId
+          accountTypeCode
         );
         break;
       default:
@@ -625,10 +569,9 @@ module.exports.signin = async (req, res, next) => {
         expiresIn: process.env.TOKEN_EXPIRATION,
       }
     );
-    return res
-      .set("Authorization", `Bearer ${token}`)
-      .status(200)
-      .send(account);
+    return res.set("Authorization", `Bearer ${token}`).status(200).send({
+      account,
+    });
   } catch (error) {
     next(error);
   }
@@ -638,27 +581,32 @@ module.exports.signin = async (req, res, next) => {
 
 module.exports.resignin = async (req, res, next) => {
   try {
-    const account = await accountModel.findWithProfileById(
+    const existAccount = await accountModel.findWithProfileById(
       req.dataToken.accountId
     );
-    if (!account || !account[0]) {
+    if (!existAccount || !existAccount[0]) {
       throw createError(401, "The email does not match!");
     }
-
+    if (
+      existAccount[0].accountStatus === databaseCode.statusCode.account_inactive ||
+      existAccount[0].profileStatus === databaseCode.statusCode.profile_close
+    )
+      throw createError(401, "Your account is inactive or closed");
     return res.set("Authorization", `Bearer ${req.newToken}`).status(200).send({
-      accountId: account[0].accountId,
-      username: account[0].username,
-      accountType: account[0].accountType,
-      accountStatus: account[0].accountStatus,
-      socialAuthorization: account[0].socialAuthorization,
-      profileId: account[0].profileId,
-      email: account[0].email,
-      fullName: account[0].fullName,
-      profileType: account[0].profileType,
-      profileStatus: account[0].profileStatus,
-      avatarId: account[0].avatarId,
-      avatarPath: account[0].avatarPath,
-      avatarAlt: account[0].avatarAlt,
+      accountId: existAccount[0].accountId,
+      username: existAccount[0].username,
+      accountType: existAccount[0].accountType,
+      accountStatus: existAccount[0].accountStatus,
+      socialAuthorization: existAccount[0].socialAuthorization,
+      profileId: existAccount[0].profileId,
+      email: existAccount[0].email,
+      fullName: existAccount[0].fullName,
+      profileType: existAccount[0].profileType,
+      profileStatus: existAccount[0].profileStatus,
+      avatarId: existAccount[0].avatarId,
+      avatarPath: existAccount[0].avatarPath,
+      avatarAlt: existAccount[0].avatarAlt,
+      requirePassword: existAccount[0].requirePassword,
     });
   } catch (error) {
     next(error);
@@ -697,7 +645,7 @@ module.exports.resetPassword = async (req, res, next) => {
     const salt = bcrypt.genSaltSync(10);
     const hashPassword = bcrypt.hashSync(newPassword, salt);
 
-    const updateStatus = await accountModel.updatePasswordById(
+    const updateStatus = await accountModel.resetPasswordById(
       existsAccount[0].accountId,
       hashPassword
     );

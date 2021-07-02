@@ -4,12 +4,6 @@ module.exports.signupValidation = (data) => {
   const schema = Joi.object({
     username: Joi.string().email().trim().required(),
     password: Joi.string().min(8).max(16).trim().required(),
-    accountType: Joi.string().valid("system").default("system"),
-    profileType: Joi.string().valid("free", "premium").default("free"),
-    accountStatus: Joi.string().valid("active", "inactive").default("inactive"),
-    profileStatus: Joi.string()
-      .valid("public", "private", "close")
-      .default("public"),
     socialAuthorization: Joi.string().trim().default(null),
     fullName: Joi.string().trim().default(null).required(),
     youtubeAccount: Joi.string().trim().default(null),
@@ -55,13 +49,13 @@ module.exports.signupSocialValidation = (data) => {
   return schema.validate(data);
 };
 
-module.exports.signinSystemValidation = (data) => {
+module.exports.signinValidation = (data) => {
   const schema = Joi.object({
     username: Joi.string().email().trim().default(null),
     password: Joi.string().min(8).max(16).trim().default(null),
     accountType: Joi.string()
-      .valid("facebook", "google", "system")
-      .default("system")
+      .valid("account_facebook", "account_google", "account_system")
+      .default("account_system")
       .required(),
     socialAuthorization: Joi.string().trim().default(null),
     accessToken: Joi.string().trim().default(null),
@@ -174,7 +168,7 @@ module.exports.searchValidation = (data) => {
   return schema.validate(data);
 };
 
-module.exports.addTracksToOwnerPlaylist = (data) => {
+module.exports.addTracksToOwnerPlaylistValidation = (data) => {
   const schema = Joi.object({
     playlist: Joi.number().min(0),
     tracks: Joi.array().items(Joi.string().trim()),

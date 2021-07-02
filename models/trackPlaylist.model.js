@@ -104,4 +104,30 @@ trackPlaylist.deleteById = (trackPlaylistId) => {
   });
 };
 
+////////////////////////////////////////////////////////////////////////////////
+trackPlaylist.getByPlaylist = (playlistId) => {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((errorConnection, connection) => {
+      if (errorConnection) return reject(errorConnection);
+      pool.query(
+        `SELECT
+          *
+        FROM
+          trackPlaylist tp
+        WHERE
+          tp.playlist = ?
+        `,
+        playlistId,
+        (error, res) => {
+          connection.release();
+          if (error) {
+            return reject(createError(500, error.code + error.sqlMessage));
+          }
+          return resolve(res);
+        }
+      );
+    });
+  });
+};
+
 module.exports = trackPlaylist;

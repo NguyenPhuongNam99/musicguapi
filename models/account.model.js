@@ -34,7 +34,8 @@ Account.findWithProfileByEmail = (email, type) => {
         p.profileStatus,
         i.imageId as "avatarId",
         i.path as "avatarPath",
-        i.alt as "avatarAlt"
+        i.alt as "avatarAlt",
+        a.requirePassword
         FROM
           account a
         INNER JOIN profile p ON
@@ -78,7 +79,8 @@ Account.findWithProfileById = (accountId) => {
         p.profileStatus,
         i.imageId as "avatarId",
         i.path as "avatarPath",
-        i.alt as "avatarAlt"
+        i.alt as "avatarAlt",
+        a.requirePassword
         FROM
           account a
         INNER JOIN profile p ON
@@ -273,6 +275,39 @@ Account.updatePasswordById = (accountId, newPassword) => {
         account a
         SET
         a.password = ?
+        WHERE
+        a.accountId = ?
+        LIMIT 1`,
+        [newPassword, accountId],
+        (error, res) => {
+          connection.release();
+          if (error) {
+            return reject(createError(500, error.code + error.sqlMessage));
+          }
+
+          if (res.affectedRows == 0) {
+            // not found account with the id
+            return reject(createError(401, "Your account does not exist"));
+          }
+          if (res.changedRows == 0) {
+            return reject(createError(401, "Your account was active"));
+          }
+          return resolve({ status: "successfully" });
+        }
+      );
+    });
+  });
+};
+
+Account.resetPasswordById = (accountId, newPassword) => {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((errorConnection, connection) => {
+      if (errorConnection) return reject(errorConnection);
+      pool.query(
+        `UPDATE
+        account a
+        SET
+        a.password = ?, a.requirePassword = 1
         WHERE
         a.accountId = ?
         LIMIT 1`,

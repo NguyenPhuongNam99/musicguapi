@@ -2,7 +2,10 @@ const { createError } = require("../common/createError");
 const trackModel = require("../models/track.model");
 const fs = require("fs");
 var path = require("path");
-const { youtubeService } = require("../common/googleService");
+const {
+  youtubeService,
+  getYoutubeVideoById,
+} = require("../common/googleService");
 const youtubeStream = require("youtube-audio-stream");
 const ytdl = require("ytdl-core");
 const ffmpeg = require("fluent-ffmpeg");
@@ -17,35 +20,17 @@ module.exports.getById = async (req, res, next) => {
     if (bodyValidation.error) {
       throw createError(400, bodyValidation.error.details[0].message);
     }
-    let requestId = null;
+    let existsTrack = null;
     if (bodyValidation.value.youtubeVideoId) {
-      requestId = bodyValidation.value.youtubeVideoId;
-    } else {
-      if (bodyValidation.value.videoId) {
-        const track = await trackModel.findYoutubeVideoIdById(
-          bodyValidation.value.videoId
-        );
-        if (!track || !track[0]) {
-          throw createError(401, "The track does not match!");
-        }
-        requestId = track[0].youtubeVideoId;
+      existsTrack = await getYoutubeVideoById(
+        bodyValidation.value.youtubeVideoId
+      );
+      if (existsTrack.pageInfo.totalResults > 0) {
+        existsTrack.urlPlayMusic = `https://localhost:4000/track/play?youtubeVideoId=${bodyValidation.value.youtubeVideoId}`;
       }
     }
-    youtubeService.videos.list(
-      {
-        part: "snippet, statistics, topicDetails, localizations, recordingDetails, status, contentDetails, topicDetails, recordingDetails, liveStreamingDetails",
-        id: requestId,
-      },
-      function (err, response) {
-        if (err) {
-          console.log("The API returned an error: " + err);
-          throw createError(401, "Youtube API V3 Error");
-        }
-        if (response) {
-          return res.status(200).send(response.data.items[0]);
-        }
-      }
-    );
+    if (!existsTrack) throw createError(404, "The playlist not found");
+    return res.status(200).send(existsTrack);
   } catch (error) {
     next(error);
   }
@@ -108,15 +93,15 @@ module.exports.playById = async (req, res, next) => {
     if (!ytdl.validateID(bodyValidation.value.youtubeVideoId)) {
       throw createError(404, "The video not found!");
     }
-
+    const range = req.headers.range;
+    if (!range) {
+      throw createError(400, "Requires Range");
+    }
     const video = ytdl(requestUrl, {
       range: { start: 0, end: 1000 },
       filter: "audioonly",
     });
-    const range = req.headers.range;
-    if (!range) {
-      res.status(400).send("Requires Range");
-    }
+
     video.on("info", (info, format) => {
       var parsed = urlLib.parse(format.url);
       parsed.method = "HEAD";

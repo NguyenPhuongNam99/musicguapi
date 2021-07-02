@@ -14,10 +14,70 @@ module.exports.getYoutubePlaylistById = (youtubePlaylistId) => {
       },
       function (err, response) {
         if (err) {
-          reject(createError(404, "The playlist Youtube API V3 not found"));
+          return reject(
+            createError(404, "The playlist Youtube API V3 not found")
+          );
         }
         if (response) {
-          resolve(response.data);
+          return resolve(response.data);
+        }
+      }
+    );
+  });
+};
+
+module.exports.getYoutubeVideoById = (youtubeVideoId) => {
+  return new Promise((resolve, reject) => {
+    youtubeService.videos.list(
+      {
+        part: "snippet, statistics, topicDetails, localizations, recordingDetails, status, contentDetails, topicDetails, recordingDetails, liveStreamingDetails",
+        id: youtubeVideoId,
+      },
+      function (err, response) {
+        if (err) {
+          return reject(createError(404, "The video Youtube API V3 not found"));
+        }
+        if (response) {
+          return resolve(response.data);
+        }
+      }
+    );
+  });
+};
+
+module.exports.getPlaylistItemsById = (youtubePlaylistId, pageToken) => {
+  return new Promise((resolve, reject) => {
+    youtubeService.playlistItems.list(
+      {
+        part: "snippet, status, contentDetails",
+        playlistId: youtubePlaylistId || null,
+        pageToken: pageToken || null,
+      },
+      (err, response) => {
+        if (err) {
+          return reject(createError(401, "Youtube API V3 Error"));
+        }
+        if (response) {
+          return resolve(response.data);
+        }
+      }
+    );
+  });
+};
+
+module.exports.getChannelById = (youtubeChannelId) => {
+  return new Promise((resolve, reject) => {
+    youtubeService.channels.list(
+      {
+        part: "brandingSettings, contentDetails, contentOwnerDetails, localizations, statistics, status, topicDetails, snippet",
+        id: youtubeChannelId,
+      },
+      function (err, response) {
+        if (err) {
+          return reject(createError(401, "Youtube API V3 Error"));
+        }
+        if (response) {
+          return resolve(response.data);
         }
       }
     );
