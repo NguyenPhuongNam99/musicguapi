@@ -4,40 +4,33 @@ const pool = require("../database/mysql.database");
 const Playlist = function (profile = {}) {
   this.title = profile.title || null;
   this.thumbnail = profile.thumbnail || null;
-  this.size = profile.size || null;
-  this.duration = profile.duration || null;
-  this.status = profile.status || null;
   this.createdAt = profile.createdAt || null;
   this.updatedAt = profile.updatedAt || null;
 };
 ////////////////////////////////////////////////////////////////////////////////
-Playlist.findById = (playlistId) => {
+Playlist.getById = (playlistId) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) return reject(errorConnection);
       pool.query(
-        `SELECT
-          p.*,
-          GROUP_CONCAT(t2.label) as "playlistTypes",
-          i.path as "thumbnailPath",
-          i.alt as "thumbnailAlt",
-          s.name as "statusName"
-        FROM
-          playlist p
-        LEFT JOIN playlistType pt ON
-          p.playlistId = pt.playlist
-        LEFT JOIN type t2 ON
-          pt.type = t2.typeId
-        LEFT JOIN image i ON
-          p.thumbnail = i.imageID
-        LEFT JOIN status s ON
-          p.status = s.statusId
-        WHERE
-          p.playlistId = ?
-        GROUP BY
-          p.playlistId
-        LIMIT 0,
-          1`,
+        `
+          SELECT
+            p.*,
+            i.path as "thumbnailPath",
+            i.alt as "thumbnailAlt"
+          FROM
+            playlist p
+          LEFT JOIN playlistType pt ON
+            p.playlistId = pt.playlist
+          LEFT JOIN image i ON
+            p.thumbnail = i.imageID
+          WHERE
+            p.playlistId = ?
+          GROUP BY
+            p.playlistId
+          LIMIT 0,
+          1
+        `,
         playlistId,
         (error, res) => {
           connection.release();
@@ -51,22 +44,31 @@ Playlist.findById = (playlistId) => {
   });
 };
 ////////////////////////////////////////////////////////////////////////////////
-Playlist.createProfilePlaylist = (profilePlaylist) => {
+Playlist.checkExistsById = (playlistId) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) return reject(errorConnection);
       pool.query(
-        "INSERT INTO profilePlaylist SET ?",
-        profilePlaylist,
+        `
+          SELECT
+            p.playlistId
+          FROM
+            playlist p
+          WHERE
+            p.playlistId = ?
+          LIMIT 0,
+          1
+        `,
+        playlistId,
         (error, res) => {
           connection.release();
           if (error) {
             return reject(createError(500, error.code + error.sqlMessage));
           }
-          return resolve({
-            profilePlaylistId: res.insertId,
-            ...profilePlaylist,
-          });
+          if (!res.length) {
+            return resolve(false);
+          }
+          return resolve(true);
         }
       );
     });
@@ -74,7 +76,74 @@ Playlist.createProfilePlaylist = (profilePlaylist) => {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-Playlist.create = (newPlaylist) => {
+Playlist.existsByIdAndProfile = (playlistId, profileId) => {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((errorConnection, connection) => {
+      if (errorConnection) return reject(errorConnection);
+      pool.query(
+        `
+          SELECT
+            p.playlistId
+          FROM
+            playlist p
+          WHERE
+            p.playlistId = ?
+          AND
+            p.profile = ?
+          LIMIT 0,
+          1
+        `,
+        [playlistId, profileId],
+        (error, res) => {
+          connection.release();
+          if (error) {
+            return reject(createError(500, error.code + error.sqlMessage));
+          }
+          if (!res.length) {
+            return resolve(false);
+          }
+          return resolve(true);
+        }
+      );
+    });
+  });
+};
+
+////////////////////////////////////////////////////////////////////////////////
+Playlist.checkExistsByIdAndProfile = (playlistId, profile) => {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((errorConnection, connection) => {
+      if (errorConnection) return reject(errorConnection);
+      pool.query(
+        `
+          SELECT
+            p.playlistId
+          FROM
+            playlist p
+          WHERE
+            p.playlistId = ? AND
+            p.profile = ?
+          LIMIT 0,
+          1
+        `,
+        [playlistId, profile],
+        (error, res) => {
+          connection.release();
+          if (error) {
+            return reject(createError(500, error.code + error.sqlMessage));
+          }
+          if (!res.length) {
+            return resolve(false);
+          }
+          return resolve(true);
+        }
+      );
+    });
+  });
+};
+
+////////////////////////////////////////////////////////////////////////////////
+Playlist.createPlaylist = (newPlaylist) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) return reject(errorConnection);
@@ -90,13 +159,13 @@ Playlist.create = (newPlaylist) => {
 };
 ////////////////////////////////////////////////////////////////////////////////
 
-Playlist.delete = (playlistId) => {
+Playlist.deleteByIdAndProfile = (playlistId, profileID) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) return reject(errorConnection);
       pool.query(
-        "DELETE FROM playlist WHERE playlistId = ?",
-        playlistId,
+        "DELETE FROM playlist WHERE playlistId = ? AND profile = ?",
+        [playlistId, profileID],
         (error, res) => {
           connection.release();
           if (error) {
@@ -104,7 +173,7 @@ Playlist.delete = (playlistId) => {
           }
           if (res.affectedRows == 0) {
             // not found Customer with the id
-            return resolve({ kind: "not_found" }, null);
+            return resolve({ kind: "not_found" });
           }
           return resolve({ kind: "successfully" });
         }
@@ -115,56 +184,21 @@ Playlist.delete = (playlistId) => {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-Playlist.deleteProfilePlaylist = (profilePlaylistId) => {
-  return new Promise((resolve, reject) => {
-    pool.getConnection((errorConnection, connection) => {
-      if (errorConnection) return reject(errorConnection);
-      pool.query(
-        "DELETE FROM profilePlaylist WHERE profilePlaylistId = ?",
-        profilePlaylistId,
-        (error, res) => {
-          connection.release();
-          if (error) {
-            return reject(createError(500, error.code + error.sqlMessage));
-          }
-          if (res.affectedRows == 0) {
-            // not found Customer with the id
-            return resolve({ kind: "not_found" }, null);
-          }
-          return resolve({ kind: "successfully" });
-        }
-      );
-    });
-  });
-};
-
-////////////////////////////////////////////////////////////////////////////////
-
-Playlist.findByProfile = (profileId) => {
+Playlist.getByProfile = (profileId) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) return reject(errorConnection);
       pool.query(
         `SELECT
           p.*,
-          GROUP_CONCAT(t2.label) as "playlistTypes",
           i.path as "thumbnailPath",
-          i.alt as "thumbnailAlt",
-          s.name as "statusName"
+          i.alt as "thumbnailAlt"
         FROM
           playlist p
-        LEFT JOIN profilePlaylist pp ON
-          p.playlistId = pp.playlist
-        LEFT JOIN playlistType pt ON
-          p.playlistId = pt.playlist
-        LEFT JOIN type t2 ON
-          pt.type = t2.typeId
         LEFT JOIN image i ON
           p.thumbnail = i.imageID
-        LEFT JOIN status s ON
-          p.status = s.statusId
         WHERE
-          pp.profile = ?
+          p.profile = ?
         GROUP BY
           p.playlistId
         `,
@@ -201,7 +235,7 @@ Playlist.findTracksById = (playlistId) => {
         LEFT JOIN status s ON
           t.status = s.statusId
         WHERE
-          tp.playlist = ?
+          p.playlistId = ?
         `,
         playlistId,
         (error, res) => {

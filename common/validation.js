@@ -105,10 +105,6 @@ module.exports.changeAvatarValidation = (data) => {
 module.exports.createPlaylistValidation = (data) => {
   const schema = Joi.object({
     title: Joi.string().trim().required(),
-    size: Joi.number().min(0),
-    duration: Joi.number().min(0),
-    type: Joi.number().min(0),
-    status: Joi.number().min(0).default(11), //playlist_public
     thumbnail: {
       path: Joi.string().trim(),
       alt: Joi.string().trim(),
@@ -118,6 +114,70 @@ module.exports.createPlaylistValidation = (data) => {
     },
     createdAt: Joi.date().default(new Date()),
     updatedAt: Joi.date().default(new Date()),
+  });
+
+  return schema.validate(data);
+};
+
+module.exports.followPlaylistValidation = (data) => {
+  const schema = Joi.object({
+    youtubePlaylist: Joi.string().trim().default(null),
+    playlist: Joi.string().trim().default(null),
+    createdAt: Joi.date().default(new Date()),
+    updatedAt: Joi.date().default(new Date()),
+  });
+
+  return schema.validate(data);
+};
+
+module.exports.playVideoValidation = (data) => {
+  const schema = Joi.object({
+    youtubeVideoId: Joi.string().trim(),
+    videoId: Joi.string().trim(),
+    pageToken: Joi.string().trim().default(null),
+  });
+
+  return schema.validate(data);
+};
+
+module.exports.playPlaylistValidation = (data) => {
+  const schema = Joi.object({
+    youtubePlaylistId: Joi.string().trim().default(null),
+    playlistId: Joi.string().trim().default(null),
+    youtubeChannelId: Joi.string().trim().default(null),
+    channelId: Joi.string().trim().default(null),
+    pageToken: Joi.string().trim().default(null),
+  });
+
+  return schema.validate(data);
+};
+
+module.exports.getChannelValidation = (data) => {
+  const schema = Joi.object({
+    youtubeChannelId: Joi.string().trim().default(null),
+    channelId: Joi.string().trim().default(null),
+    pageToken: Joi.string().trim().default(null),
+  });
+
+  return schema.validate(data);
+};
+
+module.exports.searchValidation = (data) => {
+  const schema = Joi.object({
+    type: Joi.string().trim().default("video,channel,playlist"),
+    q: Joi.string().trim().default(null),
+    order: Joi.string().trim().default("relevance"),
+    channelId: Joi.string().trim().default(null),
+    pageToken: Joi.string().trim().default(null),
+  });
+
+  return schema.validate(data);
+};
+
+module.exports.addTracksToOwnerPlaylist = (data) => {
+  const schema = Joi.object({
+    playlist: Joi.number().min(0),
+    tracks: Joi.array().items(Joi.string().trim()),
   });
 
   return schema.validate(data);

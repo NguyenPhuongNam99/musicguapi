@@ -5,15 +5,42 @@ const { verifyToken } = require("../middlewares/token.middleware");
 
 //private
 
-router.get("/get/:id", verifyToken, playlistController.getById);
-router.get("/getbyprofile/:id", verifyToken, playlistController.getByProfile);
-router.get("/gettracks/:id", verifyToken, playlistController.getTracksById);
+router.get("/getbyid", verifyToken, playlistController.getById);
+router.get("/getbychannel", verifyToken, playlistController.getByChannelId);
+router.get("/getbyprofile", verifyToken, playlistController.getByProfileId);
+router.get("/gettracks/", verifyToken, playlistController.getTracksById);
 
 router.post(
-  "/profileplaylist/create",
+  "/owner/create",
   verifyToken,
   imageUpload,
-  playlistController.createProfilePlaylist
+  playlistController.createOwnPlaylist
+);
+router.delete(
+  "/owner/delete/:id",
+  verifyToken,
+  playlistController.deleteOwnPlaylist
+);
+
+router.post(
+  "/follow/create",
+  verifyToken,
+  playlistController.createFollowPlaylist
+);
+router.delete(
+  "/follow/delete/:id",
+  verifyToken,
+  playlistController.deleteFollowPlaylist
+);
+router.post(
+  "/owner/addtracks",
+  verifyToken,
+  playlistController.addTracksToOwnerPlaylist
+);
+router.delete(
+  "/owner/deletetracks",
+  verifyToken,
+  playlistController.deleteTracksToOwnerPlaylist
 );
 
 module.exports = router;

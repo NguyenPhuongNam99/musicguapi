@@ -1,28 +1,28 @@
-module.exports.typeVariable = {
-  system: 1,
-  google: 2,
-  facebook: 3,
-  free: 4,
-  premium: 5,
-  track_rock: 6,
-  track_pop: 7,
-  track_ballad: 8,
-  track_edm: 9,
-  playlist_owner: 10,
-  playlist_following: 11,
-};
-
-module.exports.statusVariable = {
-    public: 1,
-    private: 2,
-    close: 3,
-    active: 4,
-    inactive: 5,
+module.exports.databaseCode = {
+  typeCode: {
+    account_system: 1,
+    account_google: 2,
+    account_facebook: 3,
+    profile_free: 4,
+    profile_premium: 5,
+    track_rock: 6,
+    track_pop: 7,
+    track_ballad: 8,
+    track_edm: 9,
+    playlist_owner: 10,
+    playlist_following: 11,
+  },
+  statusCode: {
+    profile_public: 1,
+    profile_private: 2,
+    profile_close: 3,
+    account_active: 4,
+    account_inactive: 5,
     track_public: 6,
     track_private: 7,
     track_delete: 8,
     playlist_delete: 9,
     playlist_private: 10,
     playlist_public: 11,
-  };
-  
+  },
+};

@@ -1,23 +1,44 @@
 const { createError } = require("../common/createError");
-const { createPlaylistValidation } = require("../common/validation");
+const {
+  createPlaylistValidation,
+  playPlaylistValidation,
+  followPlaylistValidation,
+  addTracksToPlaylistValidation,
+} = require("../common/validation");
 const playlistModel = require("../models/playlist.model");
 const imageModel = require("../models/image.model");
+const profilePlaylistModel = require("../models/profilePlaylist.model");
 const typeModel = require("../models/type.model");
+const trackPlaylistModel = require("../models/trackPlaylist.model");
+const { databaseCode } = require("../database/variable.database");
+const {
+  youtubeService,
+  getYoutubePlaylistById,
+} = require("../common/googleService");
+const ytdl = require("ytdl-core");
+
 //////////////////////////////////////////////////////////////////////////////////
 
 module.exports.getById = async (req, res, next) => {
   try {
-    const playlist = await playlistModel.findById(req.params.id);
-    if (!playlist || !playlist[0]) {
-      throw createError(401, "The playlist does not match!");
+    const bodyValidation = playPlaylistValidation(req.query);
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
     }
-    playlist[0].playlistTypes = playlist[0].playlistTypes
-      ? playlist[0].playlistTypes.split(",")
-      : null;
-    return res
-      .set("Authorization", `Bearer ${req.newToken || ""}`)
-      .status(200)
-      .send(playlist[0]);
+    let existsPlaylist = null;
+    if (bodyValidation.value.youtubePlaylistId) {
+      existsPlaylist = await getYoutubePlaylistById(
+        bodyValidation.value.youtubePlaylistId
+      );
+    } else {
+      if (bodyValidation.value.playlistId) {
+        existsPlaylist = await playlistModel.getById(
+          bodyValidation.value.playlistId
+        );
+      }
+    }
+    if (!existsPlaylist) throw createError(404, "The playlist not found");
+    return res.status(200).send(existsPlaylist);
   } catch (error) {
     next(error);
   }
@@ -25,21 +46,69 @@ module.exports.getById = async (req, res, next) => {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-module.exports.getByProfile = async (req, res, next) => {
+module.exports.getByChannelId = async (req, res, next) => {
   try {
-    const playlists = await playlistModel.findByProfile(req.params.id);
-    if (!playlists || !playlists[0]) {
-      throw createError(401, "The playlist does not match!");
+    const bodyValidation = playPlaylistValidation(req.query);
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
     }
-    playlists.forEach((playlist) => {
-      playlist.playlistTypes = playlist.playlistTypes
-        ? playlist.playlistTypes.split(",")
-        : null;
-    });
+
+    if (bodyValidation.value.youtubeChannelId) {
+      youtubeService.playlists.list(
+        {
+          part: "snippet, status, contentDetails, localizations",
+          channelId: bodyValidation.value.youtubeChannelId || null,
+          pageToken: bodyValidation.value.pageToken || null,
+        },
+        function (err, response) {
+          if (err) {
+            console.log("The API returned an error: " + err);
+            throw createError(401, "Youtube API V3 Error");
+          }
+          if (response) {
+            return res.status(200).send(response.data);
+          }
+        }
+      );
+    } else {
+      throw createError(404, "The playlist not found");
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.getByProfileId = async (req, res, next) => {
+  try {
+    if (!req.dataToken || !req.dataToken.profileId)
+      throw createError(404, "Don't have a profile");
+    const [ownerPlaylist, followPlaylist] = await Promise.all([
+      (async () => {
+        const existsPlaylists = await playlistModel.getByProfile(
+          req.dataToken.profileId
+        );
+        if (!existsPlaylists) throw createError(404, "The playlist not found");
+        return existsPlaylists;
+      })(),
+      (async () => {
+        const existsPlaylists = await profilePlaylistModel.getByProfile(
+          req.dataToken.profileId
+        );
+        if (!existsPlaylists) throw createError(404, "The playlist not found");
+        const existsYouTube = await Promise.all(
+          existsPlaylists.map(async (existsPlaylist) => {
+            return await getYoutubePlaylistById(existsPlaylist.youtubePlaylist);
+          })
+        );
+        return existsYouTube;
+      })(),
+    ]);
+
     return res
-      .set("Authorization", `Bearer ${req.newToken || ""}`)
       .status(200)
-      .send(playlists);
+      .send({ ownerPlaylist: ownerPlaylist, followPlaylist: followPlaylist });
   } catch (error) {
     next(error);
   }
@@ -49,14 +118,40 @@ module.exports.getByProfile = async (req, res, next) => {
 
 module.exports.getTracksById = async (req, res, next) => {
   try {
-    const playlists = await playlistModel.findTracksById(req.params.id);
-    if (!playlists || !playlists[0]) {
-      throw createError(401, "The playlist does not match!");
+    const bodyValidation = playPlaylistValidation(req.query);
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
     }
-    return res
-      .set("Authorization", `Bearer ${req.newToken || ""}`)
-      .status(200)
-      .send(playlists);
+    let requestId = null;
+    if (bodyValidation.value.youtubePlaylistId) {
+      requestId = bodyValidation.value.youtubePlaylistId;
+    } else {
+      // if (bodyValidation.value.videoId) {
+      //   const track = await trackModel.findYoutubeVideoIdById(
+      //     bodyValidation.value.videoId
+      //   );
+      //   if (!track || !track[0]) {
+      //     throw createError(401, "The track does not match!");
+      //   }
+      //   requestId = track[0].youtubePlaylistId;
+      // }
+    }
+    youtubeService.playlistItems.list(
+      {
+        part: "snippet, status, contentDetails",
+        playlistId: requestId,
+        pageToken: bodyValidation.value.pageToken || null,
+      },
+      (err, response) => {
+        if (err) {
+          console.log("The API returned an error: " + err);
+          throw createError(401, "Youtube API V3 Error");
+        }
+        if (response) {
+          return res.status(200).send(response.data);
+        }
+      }
+    );
   } catch (error) {
     next(error);
   }
@@ -64,10 +159,8 @@ module.exports.getTracksById = async (req, res, next) => {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-module.exports.createProfilePlaylist = async (req, res, next) => {
-  let save = null;
+module.exports.createOwnPlaylist = async (req, res, next) => {
   let savePlaylist = null;
-  let saveProfilePlaylist = null;
   try {
     const bodyValidation = createPlaylistValidation({
       ...JSON.parse(req.body.content),
@@ -88,16 +181,12 @@ module.exports.createProfilePlaylist = async (req, res, next) => {
       })(),
     ]);
 
-    const newPlaylist = new playlistModel({
-      ...bodyValidation.value,
+    savePlaylist = await playlistModel.createPlaylist({
+      title: bodyValidation.value.title,
       thumbnail: saveImage.imageId,
-    });
-
-    savePlaylist = await playlistModel.create(newPlaylist);
-    saveProfilePlaylist = await playlistModel.createProfilePlaylist({
-      playlist: savePlaylist.playlistId,
       profile: req.dataToken.profileId,
-      type: 10,
+      createdAt: bodyValidation.value.createdAt,
+      updatedAt: bodyValidation.value.updatedAt,
     });
 
     return res
@@ -109,11 +198,6 @@ module.exports.createProfilePlaylist = async (req, res, next) => {
         thumbnailAlt: saveImage.alt,
       });
   } catch (error) {
-    if (saveProfilePlaylist && saveProfilePlaylist.profilePlaylistId) {
-      await playlistModel.deleteProfilePlaylist(
-        saveProfilePlaylist.profilePlaylistId
-      );
-    }
     if (savePlaylist && savePlaylist.playlistId) {
       await playlistModel.delete(savePlaylist.playlistId);
     }
@@ -121,44 +205,217 @@ module.exports.createProfilePlaylist = async (req, res, next) => {
   }
 };
 
-////////////////////////////////////////////////////////////////
-module.exports.createProfilePlaylist = async (req, res, next) => {
-  let save = null;
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.deleteOwnPlaylist = async (req, res, next) => {
   let savePlaylist = null;
-  let saveProfilePlaylist = null;
   try {
-    const bodyValidation = createPlaylistValidation({
-      ...JSON.parse(req.body.content),
-      thumbnail: req.body.image,
-    });
-
-    if (bodyValidation.error) {
-      throw createError(400, bodyValidation.error.details[0].message);
+    if (req.params.id) {
+      const existsPlaylist = await playlistModel.existsByIdAndProfile(
+        req.params.id,
+        req.dataToken.profileId
+      );
+      if (!existsPlaylist) throw createError(404, "The playlist not found");
+      await trackPlaylistModel.deleteByPlaylist(req.params.id);
+      await profilePlaylistModel.deleteByIdAndProfile(
+        req.params.id,
+        req.dataToken.profileId
+      );
+      const result = await playlistModel.deleteByIdAndProfile(
+        req.params.id,
+        req.dataToken.profileId
+      );
+      if (result.kind === "not_found") {
+        throw createError(404, "Not Found");
+      }
+    } else {
+      throw createError(404, "The playlist not found");
     }
-
-    saveProfilePlaylist = await playlistModel.createProfilePlaylist({
-      playlist: savePlaylist.playlistId,
-      profile: req.dataToken.profileId,
-      type: 11,
-    });
 
     return res
       .set("Authorization", `Bearer ${req.newToken || ""}`)
       .status(200)
       .send({
-        ...savePlaylist,
-        thumbnailPath: saveImage.path,
-        thumbnailAlt: saveImage.alt,
+        meta: {
+          status: 200,
+          message: "Successfully",
+        },
       });
   } catch (error) {
-    if (saveProfilePlaylist && saveProfilePlaylist.profilePlaylistId) {
-      await playlistModel.deleteProfilePlaylist(
-        saveProfilePlaylist.profilePlaylistId
-      );
-    }
     if (savePlaylist && savePlaylist.playlistId) {
       await playlistModel.delete(savePlaylist.playlistId);
     }
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.createFollowPlaylist = async (req, res, next) => {
+  let savePlaylist = null;
+  try {
+    const bodyValidation = followPlaylistValidation(req.query);
+
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
+    }
+
+    if (bodyValidation.value.youtubePlaylist) {
+      // const youtubePlaylistIdValid = ytdl.validateID(
+      //   bodyValidation.value.youtubePlaylistId
+      // );
+      // if (!youtubePlaylistIdValid)
+      //   throw createError(404, "The youtube playlist not found");
+      savePlaylist = await profilePlaylistModel.create({
+        profile: req.dataToken.profileId,
+        youtubePlaylist: bodyValidation.value.youtubePlaylist,
+        createdAt: bodyValidation.value.createdAt,
+        updatedAt: bodyValidation.value.updatedAt,
+      });
+    } else {
+      if (bodyValidation.value.playlist) {
+        const playlistIdValid = await playlistModel.checkExistsById(
+          bodyValidation.value.playlist
+        );
+        if (!playlistIdValid) throw createError(404, "The playlist not found");
+        savePlaylist = await profilePlaylistModel.create({
+          profile: req.dataToken.profileId,
+          playlist: bodyValidation.value.playlist,
+          createdAt: bodyValidation.value.createdAt,
+          updatedAt: bodyValidation.value.updatedAt,
+        });
+      }
+    }
+    return res
+      .set("Authorization", `Bearer ${req.newToken || ""}`)
+      .status(200)
+      .send({
+        meta: {
+          status: 200,
+          message: "Successfully",
+        },
+      });
+  } catch (error) {
+    if (savePlaylist && savePlaylist.playlistId) {
+      await playlistModel.delete(savePlaylist.playlistId);
+    }
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.deleteFollowPlaylist = async (req, res, next) => {
+  let savePlaylist = null;
+  try {
+    if (req.params.id) {
+      const result = await profilePlaylistModel.deleteByIdAndProfile(
+        req.params.id,
+        req.dataToken.profileId
+      );
+      if (result.kind === "not_found") {
+        throw createError(404, "Not Found");
+      }
+    }
+    return res
+      .set("Authorization", `Bearer ${req.newToken || ""}`)
+      .status(200)
+      .send({
+        meta: {
+          status: 200,
+          message: "Successfully",
+        },
+      });
+  } catch (error) {
+    if (savePlaylist && savePlaylist.playlistId) {
+      await playlistModel.delete(savePlaylist.playlistId);
+    }
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.addTracksToOwnerPlaylist = async (req, res, next) => {
+  try {
+    const bodyValidation = addTracksToPlaylistValidation(req.body);
+
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
+    }
+
+    const playlistExists = await playlistModel.checkExistsByIdAndProfile(
+      bodyValidation.value.playlist,
+      req.dataToken.profileId
+    );
+
+    if (!playlistExists)
+      throw createError(
+        404,
+        "The playlist not found or you can't add tracks to this playlist"
+      );
+
+    await Promise.all(
+      bodyValidation.value.tracks.map(async (track) => {
+        if (ytdl.validateID(track))
+          await trackPlaylistModel.create({
+            trackYouTube: track,
+            playlist: bodyValidation.value.playlist,
+          });
+      })
+    );
+
+    return res
+      .set("Authorization", `Bearer ${req.newToken || ""}`)
+      .status(200)
+      .send({
+        meta: {
+          status: 200,
+          message: "Successfully",
+        },
+      });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.deleteTracksToOwnerPlaylist = async (req, res, next) => {
+  try {
+    const bodyValidation = addTracksToPlaylistValidation(req.body);
+
+    if (bodyValidation.error) {
+      throw createError(400, bodyValidation.error.details[0].message);
+    }
+
+    const playlistExists = await playlistModel.checkExistsByIdAndProfile(
+      bodyValidation.value.playlist,
+      req.dataToken.profileId
+    );
+
+    if (!playlistExists)
+      throw createError(
+        404,
+        "The playlist not found or you can't add tracks to this playlist"
+      );
+
+    await Promise.all(
+      bodyValidation.value.tracks.map(async (track) => {
+        if (ytdl.validateID(track)) await trackPlaylistModel.deleteById(track);
+      })
+    );
+
+    return res
+      .set("Authorization", `Bearer ${req.newToken || ""}`)
+      .status(200)
+      .send({
+        meta: {
+          status: 200,
+          message: "Successfully",
+        },
+      });
+  } catch (error) {
     next(error);
   }
 };

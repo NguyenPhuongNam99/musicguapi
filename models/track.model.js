@@ -58,12 +58,12 @@ Track.findById = (trackId) => {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-Track.findPathById = (trackId) => {
+Track.findYoutubeVideoIdById = (trackId) => {
   return new Promise((resolve, reject) => {
     pool.getConnection((errorConnection, connection) => {
       if (errorConnection) return reject(errorConnection);
       pool.query(
-        `SELECT path FROM track WHERE trackId = ? LIMIT 0, 1`,
+        `SELECT youtubeVideoId FROM track WHERE trackId = ? LIMIT 0, 1`,
         trackId,
         (error, res) => {
           connection.release();
