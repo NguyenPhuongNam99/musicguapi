@@ -16,18 +16,9 @@ const { playVideoValidation } = require("../common/validation");
 
 module.exports.getById = async (req, res, next) => {
   try {
-    const bodyValidation = playVideoValidation(req.query);
-    if (bodyValidation.error) {
-      throw createError(400, bodyValidation.error.details[0].message);
-    }
-    let existsTrack = null;
-    if (bodyValidation.value.youtubeVideoId) {
-      existsTrack = await getYoutubeVideoById(
-        bodyValidation.value.youtubeVideoId
-      );
-      if (existsTrack.pageInfo.totalResults > 0) {
-        existsTrack.urlPlayMusic = `https://localhost:4000/track/play?youtubeVideoId=${bodyValidation.value.youtubeVideoId}`;
-      }
+    const existsTrack = await getYoutubeVideoById(req.params.id);
+    if (existsTrack.pageInfo.totalResults > 0) {
+      existsTrack.urlPlayMusic = `https://localhost:4000/track/play?youtubeVideoId=${req.params.id}`;
     }
     if (!existsTrack) throw createError(404, "The playlist not found");
     return res.status(200).send(existsTrack);
@@ -71,32 +62,15 @@ module.exports.getTrending = async (req, res, next) => {
 
 module.exports.playById = async (req, res, next) => {
   try {
-    const bodyValidation = playVideoValidation(req.query);
-    if (bodyValidation.error) {
-      throw createError(400, bodyValidation.error.details[0].message);
-    }
-    let requestUrl = "http://youtube.com/watch?v=";
-    if (bodyValidation.value.youtubeVideoId) {
-      requestUrl += bodyValidation.value.youtubeVideoId;
-    } else {
-      if (bodyValidation.value.videoId) {
-        const track = await trackModel.findYoutubeVideoIdById(
-          bodyValidation.value.videoId
-        );
-        if (!track || !track[0]) {
-          throw createError(401, "The track does not match!");
-        }
-        requestUrl += track[0].youtubeVideoId;
-      }
-    }
-
-    if (!ytdl.validateID(bodyValidation.value.youtubeVideoId)) {
+    if (!ytdl.validateID(req.params.id)) {
       throw createError(404, "The video not found!");
     }
+
     const range = req.headers.range;
     if (!range) {
       throw createError(400, "Requires Range");
     }
+    const requestUrl = `http://youtube.com/watch?v=${req.params.id}`;
     const video = ytdl(requestUrl, {
       range: { start: 0, end: 1000 },
       filter: "audioonly",

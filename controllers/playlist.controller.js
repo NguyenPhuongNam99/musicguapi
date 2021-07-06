@@ -4,6 +4,7 @@ const {
   playPlaylistValidation,
   followPlaylistValidation,
   addTracksToOwnerPlaylistValidation,
+  updatePlaylistValidation,
 } = require("../common/validation");
 const playlistModel = require("../models/playlist.model");
 const imageModel = require("../models/image.model");
@@ -82,7 +83,7 @@ module.exports.getByChannelId = async (req, res, next) => {
 
 //////////////////////////////////////////////////////////////////////////////////
 
-module.exports.getByProfileId = async (req, res, next) => {
+module.exports.getMyPlaylist = async (req, res, next) => {
   try {
     if (!req.dataToken || !req.dataToken.profileId)
       throw createError(404, "Don't have a profile");
@@ -99,6 +100,47 @@ module.exports.getByProfileId = async (req, res, next) => {
           req.dataToken.profileId
         );
         if (!existsPlaylists) throw createError(404, "The playlist not found");
+        const existsYouTube = await Promise.all(
+          existsPlaylists.map(async (existsPlaylist) => {
+            if (existsPlaylist.youtubePlaylist) {
+              return await getYoutubePlaylistById(
+                existsPlaylist.youtubePlaylist
+              );
+            } else if (existsPlaylist.playlist) {
+              return (await playlistModel.getById(existsPlaylist.playlist))[0];
+            }
+            return null;
+          })
+        );
+        return existsYouTube;
+      })(),
+    ]);
+
+    return res
+      .status(200)
+      .send({ ownerPlaylist: ownerPlaylist, followPlaylist: followPlaylist });
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.getByProfileId = async (req, res, next) => {
+  try {
+    if (!req.dataToken || !req.dataToken.profileId)
+      throw createError(404, "Don't have a profile");
+    const [ownerPlaylist, followPlaylist] = await Promise.all([
+      (async () => {
+        const existsPlaylists = await playlistModel.getByProfile(
+          req.dataToken.profileId
+        );
+        return existsPlaylists;
+      })(),
+      (async () => {
+        const existsPlaylists = await profilePlaylistModel.getByProfile(
+          req.dataToken.profileId
+        );
         const existsYouTube = await Promise.all(
           existsPlaylists.map(async (existsPlaylist) => {
             return await getYoutubePlaylistById(existsPlaylist.youtubePlaylist);
@@ -145,6 +187,33 @@ module.exports.getTracksById = async (req, res, next) => {
     }
     if (!listItems) throw createError(404, "The playlist not found");
     return res.status(200).send(listItems);
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.getOwnPlaylist = async (req, res, next) => {
+  try {
+    const ownerPlaylist = await playlistModel.getByProfile(req.params.id);
+
+    return res.status(200).send(ownerPlaylist);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports.getMyOwnPlaylist = async (req, res, next) => {
+  try {
+    if (!req.dataToken || !req.dataToken.profileId)
+      throw createError(404, "Don't have a profile");
+
+    const ownerPlaylist = await playlistModel.getByProfile(
+      req.dataToken.profileId
+    );
+
+    return res.status(200).send(ownerPlaylist);
   } catch (error) {
     next(error);
   }
@@ -213,7 +282,10 @@ module.exports.updateOwnPlaylist = async (req, res, next) => {
         req.dataToken.profileId
       );
       if (!existsPlaylist || !existsPlaylist[0])
-        throw createError(404, "The playlist not found");
+        throw createError(
+          404,
+          "The playlist not found or you are not allowed to update this playlist"
+        );
       if (bodyValidation.value.title)
         existsPlaylist[0].title = bodyValidation.value.title;
       const result = await playlistModel.updateById(
@@ -331,11 +403,6 @@ module.exports.createFollowPlaylist = async (req, res, next) => {
     }
 
     if (bodyValidation.value.youtubePlaylist) {
-      // const youtubePlaylistIdValid = ytdl.validateID(
-      //   bodyValidation.value.youtubePlaylistId
-      // );
-      // if (!youtubePlaylistIdValid)
-      //   throw createError(404, "The youtube playlist not found");
       savePlaylist = await profilePlaylistModel.create({
         profile: req.dataToken.profileId,
         youtubePlaylist: bodyValidation.value.youtubePlaylist,
@@ -406,6 +473,55 @@ module.exports.deleteFollowPlaylist = async (req, res, next) => {
 
 //////////////////////////////////////////////////////////////////////////////////
 
+module.exports.getFollowPlaylist = async (req, res, next) => {
+  try {
+    const followPlaylists = await profilePlaylistModel.getByProfile(
+      req.params.id
+    );
+    const existsYouTube = await Promise.all(
+      followPlaylists.map(async (followPlaylist) => {
+        if (followPlaylist.youtubePlaylist) {
+          return await getYoutubePlaylistById(followPlaylist.youtubePlaylist);
+        } else if (followPlaylist.playlist) {
+          return (await playlistModel.getById(followPlaylist.playlist))[0];
+        }
+        return null;
+      })
+    );
+
+    return res.status(200).send(existsYouTube);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports.getMyFollowPlaylist = async (req, res, next) => {
+  try {
+    if (!req.dataToken || !req.dataToken.profileId)
+      throw createError(404, "Don't have a profile");
+
+    const followPlaylists = await profilePlaylistModel.getByProfile(
+      req.dataToken.profileId
+    );
+    const existsYouTube = await Promise.all(
+      followPlaylists.map(async (followPlaylist) => {
+        if (followPlaylist.youtubePlaylist) {
+          return await getYoutubePlaylistById(followPlaylist.youtubePlaylist);
+        } else if (followPlaylist.playlist) {
+          return (await playlistModel.getById(followPlaylist.playlist))[0];
+        }
+        return null;
+      })
+    );
+
+    return res.status(200).send(existsYouTube);
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
 module.exports.addTracksToOwnerPlaylist = async (req, res, next) => {
   try {
     const bodyValidation = addTracksToOwnerPlaylistValidation(req.body);
@@ -431,6 +547,8 @@ module.exports.addTracksToOwnerPlaylist = async (req, res, next) => {
           await trackPlaylistModel.create({
             trackYouTube: track,
             playlist: bodyValidation.value.playlist,
+            createdAt: bodyValidation.value.createdAt,
+            updatedAt: bodyValidation.value.updatedAt,
           });
       })
     );

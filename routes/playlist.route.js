@@ -7,9 +7,12 @@ const { verifyToken } = require("../middlewares/token.middleware");
 
 router.get("/getbyid", verifyToken, playlistController.getById);
 router.get("/getbychannel", verifyToken, playlistController.getByChannelId);
+router.get("/getmyplaylist", verifyToken, playlistController.getMyPlaylist);
 router.get("/getbyprofile", verifyToken, playlistController.getByProfileId);
 router.get("/gettracks/", verifyToken, playlistController.getTracksById);
 
+router.get("/owner/get", verifyToken, playlistController.getMyOwnPlaylist);
+router.get("/owner/get/:id", verifyToken, playlistController.getOwnPlaylist);
 router.post(
   "/owner/create",
   verifyToken,
@@ -33,6 +36,12 @@ router.delete(
   playlistController.deleteOwnPlaylist
 );
 
+router.get("/follow/get", verifyToken, playlistController.getMyFollowPlaylist);
+router.get(
+  "/follow/get/:id",
+  verifyToken,
+  playlistController.getFollowPlaylist
+);
 router.post(
   "/follow/create",
   verifyToken,

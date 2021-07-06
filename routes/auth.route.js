@@ -8,6 +8,7 @@ const { verifyToken } = require("../middlewares/token.middleware");
 router.post("/signup", imageUpload, authController.signupSystem);
 router.post("/signin", authController.signin);
 router.get("/active/:id", authController.active);
+router.get("/resendactive/:username", authController.resendActive);
 router.patch("/resetpassword", authController.resetPassword);
 
 // router.get("/signout", authController.signout);

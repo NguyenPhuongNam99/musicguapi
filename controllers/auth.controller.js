@@ -588,7 +588,8 @@ module.exports.resignin = async (req, res, next) => {
       throw createError(401, "The email does not match!");
     }
     if (
-      existAccount[0].accountStatus === databaseCode.statusCode.account_inactive ||
+      existAccount[0].accountStatus ===
+        databaseCode.statusCode.account_inactive ||
       existAccount[0].profileStatus === databaseCode.statusCode.profile_close
     )
       throw createError(401, "Your account is inactive or closed");
@@ -622,6 +623,30 @@ module.exports.active = async (req, res, next) => {
     if (!dataToken) return res.status(401).send({ message: "Unauthorized" });
     const status = await accountModel.findByIdAndActive(dataToken.accountId);
     return res.status(200).send(status);
+  } catch (error) {
+    next(error);
+  }
+};
+
+//////////////////////////////////////////////////////////////////////////////////
+
+module.exports.resendActive = async (req, res, next) => {
+  try {
+    const existsAccount = await accountModel.findByEmail(req.params.username);
+    if (!existsAccount || !existsAccount[0])
+      throw createError(404, "Account not found");
+    const tokenActive = jwt.sign(
+      {
+        accountId: existsAccount[0].accountId,
+      },
+      process.env.TOKEN_SECURE,
+      {
+        expiresIn: process.env.TOKEN_ACTIVE_EXPIRATION,
+      }
+    );
+    //send mail confirm
+    sendMailActive(tokenActive, req.params.username);
+    return res.status(200).send("successfully");
   } catch (error) {
     next(error);
   }
@@ -729,8 +754,8 @@ module.exports.changeProfile = async (req, res, next) => {
 //////////////////////////////////////////////////////////////////////////////////
 
 module.exports.changeavatar = async (req, res, next) => {
-  let saveImage = null;
   try {
+    let saveImage = null;
     const bodyValidation = changeAvatarValidation({
       avatar: req.body.image,
     });

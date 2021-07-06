@@ -172,6 +172,8 @@ module.exports.addTracksToOwnerPlaylistValidation = (data) => {
   const schema = Joi.object({
     playlist: Joi.number().min(0),
     tracks: Joi.array().items(Joi.string().trim()),
+    createdAt: Joi.date().default(new Date()),
+    updatedAt: Joi.date().default(new Date()),
   });
 
   return schema.validate(data);
@@ -179,7 +181,7 @@ module.exports.addTracksToOwnerPlaylistValidation = (data) => {
 
 module.exports.updatePlaylistValidation = (data) => {
   const schema = Joi.object({
-    title: Joi.number().min(0).default(null),
+    title: Joi.string().trim().required(),
   });
 
   return schema.validate(data);
